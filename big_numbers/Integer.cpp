@@ -131,6 +131,10 @@ Integer::Integer(const bool val)
 {
 	Assign(static_cast<long long>(val));
 }
+Integer::Integer(const char val)
+{
+	Assign(static_cast<long long>(val));
+}
 Integer::Integer(const short val)
 {
 	Assign(static_cast<long long>(val));
@@ -144,6 +148,10 @@ Integer::Integer(const long long val)
 	Assign(static_cast<long long>(val));
 }
 Integer::Integer(const unsigned short val)
+{
+	Assign(static_cast<unsigned long long>(val));
+}
+Integer::Integer(const unsigned char val)
 {
 	Assign(static_cast<unsigned long long>(val));
 }
@@ -163,12 +171,15 @@ Integer::Integer(const wchar_t* val)
 {
 	Assign(val);
 }
-Integer::Integer(const Integer& other) : number(other.number), negative(other.negative) {}
-Integer::Integer(Integer&& other) noexcept : number(other.number), negative(other.negative) {}
+Integer::Integer(const Integer& other) :
+	number(other.number), negative(other.negative), infinity(other.infinity), nan(other.nan) {}
+Integer::Integer(Integer&& other) noexcept :
+	number(other.number), negative(other.negative), infinity(other.infinity), nan(other.nan) {}
 
 void Integer::Assign(long long num)
 {
 	negative = (num < 0);
+	nan = infinity = false;
 	number.clear();
 	do
 	{
@@ -178,7 +189,7 @@ void Integer::Assign(long long num)
 }
 void Integer::Assign(unsigned long long num)
 {
-	negative = false;
+	negative = nan = infinity = false;
 	number.clear();
 	do
 	{
@@ -190,8 +201,13 @@ void Integer::Assign(const char* num)
 {
 	if (num == nullptr)
 		return Assign(0uLL);
+	nan = infinity = false;
 	negative = (num[0] == '-') ? (num++, true) : (false);
 	number.clear();
+	if (num[0] == 'i' && num[1] == 'n' && num[2] == 'f')
+		return (infinity = true), void();
+	if (num[0] == 'n' && num[1] == 'a' && num[2] == 'n')
+		return (nan = true), void();
 	while (*num >= '0' && *num <= '9')
 		number.push_back(*(num++) - '0');
 	if(number.empty())
@@ -203,10 +219,15 @@ void Integer::Assign(const wchar_t* num)
 {
 	if (num == nullptr)
 		return Assign(0uLL);
-	negative = (num[0] == L'-') ? (num++, true) : (false);
+	nan = infinity = false;
+	negative = (num[0] == '-') ? (num++, true) : (false);
 	number.clear();
+	if (num[0] == L'i' && num[1] == L'n' && num[2] == L'f')
+		return (infinity = true), void();
+	if (num[0] == L'n' && num[1] == L'a' && num[2] == L'n')
+		return (nan = true), void();
 	while (*num >= L'0' && *num <= L'9')
-		number.push_back(*num - L'0'), num++;
+		number.push_back(*(num++) - L'0');
 	if (number.empty())
 		return Assign(0uLL);
 	number.reverse();
@@ -219,6 +240,8 @@ Integer& Integer::operator=(const Integer& other)
 	{
 		number = other.number;
 		negative = other.negative;
+		infinity = other.infinity;
+		nan = other.nan;
 	}
 	return *this;
 }
@@ -228,6 +251,8 @@ Integer& Integer::operator=(Integer&& other) noexcept
 	{
 		number = other.number;
 		negative = other.negative;
+		infinity = other.infinity;
+		nan = other.nan;
 	}
 	return *this;
 }
@@ -238,24 +263,31 @@ Integer& Integer::operator=(Integer&& other) noexcept
 
 bool Integer::Null() const
 {
-	return (number.size() == 0) || (number.size() == 1 && number[0] == '\000');
+	return ((number.size() == 0) || (number.size() == 1 && number[0] == '\000')) && !(nan || infinity);
 }
 bool Integer::Negative() const
 {
 	return negative;
 }
+bool Integer::Infinity() const
+{
+	return infinity;
+}
+bool Integer::Nan() const
+{
+	return nan;
+}
 
 bool Integer::operator==(const Integer& other) const
 {
-	if (negative != other.negative)
+	if ((negative != other.negative) || (infinity != other.infinity) || (nan || other.nan) || number.size() != other.number.size())
 		return false;
-	if (number.size() != other.number.size())
-		return false;
+	if (infinity && other.infinity)
+		return true;
 	for (size_t i = 0; i < number.size(); i++)
 		if (number[i] != other.number[i])
 			return false;
 	return true;
-
 }
 bool Integer::operator!=(const Integer& other) const
 {
@@ -263,16 +295,24 @@ bool Integer::operator!=(const Integer& other) const
 }
 bool Integer::operator<=(const Integer& other) const
 {
-	return this->operator<(other) || this->operator==(other);
+	return !(this->operator>(other));
 }
 bool Integer::operator>=(const Integer& other) const
 {
-	return this->operator>(other) || this->operator==(other);
+	return !(this->operator<(other));
 }
 bool Integer::operator<(const Integer& other) const
 {
+	if (nan || other.nan)
+		return (negative == other.negative) ? (false) : (negative);
 	if (negative != other.negative)
 		return negative;
+	if (infinity || other.infinity)
+	{
+		if (infinity && other.infinity)
+			return false;
+		return negative ? (infinity) : (!infinity);
+	}
 	if (number.size() != other.number.size())
 		return (negative) ? (number.size() > other.number.size()) : (number.size() < other.number.size());
 	for (size_t i = number.size(); i > 0; i--)
@@ -282,8 +322,16 @@ bool Integer::operator<(const Integer& other) const
 }
 bool Integer::operator>(const Integer& other) const
 {
+	if (nan || other.nan)
+		return (negative == other.negative) ? (false) : (other.negative);
 	if (negative != other.negative)
 		return other.negative;
+	if (infinity || other.infinity)
+	{
+		if (infinity && other.infinity)
+			return false;
+		return negative ? (other.infinity) : (!other.infinity);
+	}
 	if (number.size() != other.number.size())
 		return (negative) ? (number.size() < other.number.size()) : (number.size() > other.number.size());
 	for (size_t i = number.size(); i > 0; i--)
@@ -298,15 +346,15 @@ bool Integer::operator>(const Integer& other) const
 
 bool				Integer::ToBool() const
 {
-	if (number.empty())
-		return false;
-	if (number.size() == 1 && number[0] == 0)
-		return false;
-	return true;
+	return !Null();
 }
 long long			Integer::ToLLong() const
 {
 	long long res = 0;
+	if (nan)
+		return res;
+	if (infinity)
+		return negative ? std::numeric_limits<long long>::min() : std::numeric_limits<long long>::max();
 	const size_t maxSize = static_cast<size_t>(std::log10(std::numeric_limits<long long>::max())) + 1;
 	for (size_t i = 0; i < std::min(number.size(), maxSize); i++)
 		res += ((negative) ? (number[i]) : (number[i])) * static_cast<size_t>(std::pow(10, i));
@@ -315,6 +363,10 @@ long long			Integer::ToLLong() const
 unsigned long long	Integer::ToULLong() const
 {
 	unsigned long long res = 0;
+	if (nan)
+		return res;
+	if (infinity)
+		return negative ? 0uLL : std::numeric_limits<unsigned long long>::max();
 	const size_t maxSize = static_cast<size_t>(std::log10(std::numeric_limits<unsigned long long>::max())) + 1;
 	for (size_t i = 0; i < std::min(number.size(), maxSize); i++)
 		res += number[i] * static_cast<size_t>(std::pow(10, i));
@@ -322,18 +374,25 @@ unsigned long long	Integer::ToULLong() const
 }
 std::string			Integer::ToString() const
 {
-	std::string res{};
+	std::string res = "";
 	if (negative)
 		res += '-';
+	if (nan)
+		return res + "nan";
+	if (infinity)
+		return res + "inf";
 	for (size_t i = number.size(); i > 0; i--)
 		res += number[i - 1] + '0';
-	//return res.empty() ? "0" : res;
 	return res;
 }
 
 Integer::operator bool() const
 {
 	return ToBool();
+}
+Integer::operator char() const
+{
+	return static_cast<char>(ToLLong());
 }
 Integer::operator short() const
 {
@@ -346,6 +405,10 @@ Integer::operator int() const
 Integer::operator long long() const
 {
 	return ToLLong();
+}
+Integer::operator unsigned char() const
+{
+	return static_cast<unsigned char>(ToULLong());
 }
 Integer::operator unsigned short() const
 {
@@ -371,8 +434,7 @@ Integer::operator std::string() const
 Integer Integer::operator-() const
 {
 	Integer res = *this;
-	res.negative = !res.negative;
-	return res;
+	return res.MadeOpposite();
 }
 
 Integer& Integer::operator++()
@@ -408,6 +470,10 @@ Integer Integer::operator-(const Integer& other) const
 }
 Integer Integer::operator*(const Integer& other) const
 {
+	if (nan || other.nan)
+		return FabrickNan(negative != other.negative);
+	if (infinity || other.infinity)
+		return (Null() || other.Null()) ? (FabrickNan(negative != other.negative)) : (FabrickInfinity(negative != other.negative));
 	if (Null() || other.Null())
 		return Integer{};
 	Integer res;
@@ -429,6 +495,14 @@ Integer Integer::operator%(const Integer& other) const
 
 Integer& Integer::operator+=(const Integer& other)
 {
+	if (nan || other.nan)
+		return this->operator=(FabrickNan(negative));
+	if (infinity || other.infinity)
+	{
+		if (infinity && other.infinity)
+			return (negative != other.negative) ? this->operator=(Integer{}) : this->operator=(FabrickInfinity(negative));
+		return this->operator=(FabrickInfinity(negative));
+	}
 	if (negative && !other.negative)
 		return (this->operator=(other.operator-(MadeOpposite())));
 	if (other.negative)
@@ -449,6 +523,14 @@ Integer& Integer::operator+=(const Integer& other)
 }
 Integer& Integer::operator-=(const Integer& other)
 {
+	if (nan || other.nan)
+		return this->operator=(FabrickNan(negative));
+	if (infinity || other.infinity)
+	{
+		if (infinity && other.infinity)
+			return (negative == other.negative) ? (this->operator=(Integer{})) : (this->operator=(FabrickInfinity(negative)));
+		return this->operator=(FabrickInfinity(negative));
+	}
 	if (other.negative)
 		return this->operator+=(other.operator-());
 	if (negative)
@@ -476,13 +558,31 @@ Integer& Integer::operator*=(const Integer& other)
 }
 Integer& Integer::operator/=(const Integer& other)
 {
+	if (nan || other.nan)
+		return this->operator=(FabrickNan(negative != other.negative));
+	if (other.Null())
+		return (Null() || infinity) ? this->operator=(FabrickNan(negative != other.negative)) : this->operator=(FabrickInfinity(negative != other.negative));
+	if (infinity || other.infinity)
+	{
+		if (infinity && other.infinity)
+		{
+			Integer res{ 1 };
+			res.negative = negative != other.negative;
+			return this->operator=(res);
+		}
+		if (infinity)
+		{
+			negative = negative != other.negative;
+			return *this;
+		}
+		Assign(0uLL);
+		return *this;
+	}
 	if (Null())
 	{
 		negative = false;
 		return *this;
 	}
-	if (other.Null())
-		throw std::logic_error("Division by null.");
 	DecVector res;
 	division::division(number,other.number, res);
 	number = res;
@@ -491,13 +591,13 @@ Integer& Integer::operator/=(const Integer& other)
 }
 Integer& Integer::operator%=(const Integer& other)
 {
+	if (nan || other.nan || infinity || other.infinity || other.Null())
+		return this->operator=(FabrickNan(false));
 	if (Null())
 	{
 		negative = false;
 		return *this;
 	}
-	if (other.Null())
-		throw std::logic_error("Dividing by null.");
 	DecVector res, pr;
 	division::division(number, other.number, res, pr);
 	number = pr;
@@ -516,13 +616,28 @@ std::ostream& operator<<(std::ostream& out, const Integer& num)
 std::istream& operator>>(std::istream& in, Integer& num)
 {
 	num.number.clear();
+	num.nan = num.infinity = false;
 	char pr = in.get();
 	num.negative = (pr == '-');
 	if ((pr < '0' || pr > '9') && (pr != '-'))
-		return (num = 0_b), in;
+		return (num.Assign(0uLL)), in;
 	else if (pr >= '0' && pr <= '9')
 		num.number.push_back(pr - '0');
 	pr = in.get();
+	if (pr == 'i')
+	{
+		if (in.get() == 'n')
+			if (in.get() == 'f')
+				num = Integer::FabrickInfinity(num.negative);
+		return in;
+	}
+	else if (pr == 'n')
+	{
+		if (in.get() == 'a')
+			if (in.get() == 'n')
+				num = Integer::FabrickNan(num.negative);
+		return in;
+	}
 	while (pr >= '0' && pr <= '9')
 	{
 		num.number.push_back(pr - '0');
@@ -538,7 +653,7 @@ std::istream& operator>>(std::istream& in, Integer& num)
 
 Integer& Integer::MadeOpposite()
 {
-	negative = !negative;
+	negative = Null() ? false : !negative;
 	return *this;
 }
 
@@ -546,6 +661,21 @@ void Integer::RemoveLastZeros()
 {
 	while (number.back() == '\000' && number.size() > 1uLL)
 		number.pop_back();
+}
+
+Integer Integer::FabrickInfinity(bool negative)
+{
+	Integer res;
+	res.infinity = true;
+	res.negative = negative;
+	return res;
+}
+Integer Integer::FabrickNan(bool negative)
+{
+	Integer res;
+	res.nan = true;
+	res.negative = negative;
+	return res;
 }
 
 Integer operator""_b(const unsigned long long int val)
@@ -568,6 +698,10 @@ Fractional::Fractional(const bool val)
 {
 	Assign(static_cast<long long>(val));
 }
+Fractional::Fractional(const char val) 
+{
+	Assign(static_cast<long long>(val));
+}
 Fractional::Fractional(const short val) 
 {
 	Assign(static_cast<long long>(val));
@@ -579,6 +713,10 @@ Fractional::Fractional(const int val)
 Fractional::Fractional(const long long val) 
 {
 	Assign(val);
+}
+Fractional::Fractional(const unsigned char val) 
+{
+	Assign(static_cast<unsigned long long>(val));
 }
 Fractional::Fractional(const unsigned short val) 
 {
@@ -623,10 +761,13 @@ void Fractional::Assign(const char* num)
 {
 	if (num == nullptr)
 		return Assign(0uLL);
+	infinity = nan = false;
 	negative = (num[0] == '-') ? (num++, true) : (false);
 	number.clear();
 	if (num[0] == 'i' && num[1] == 'n' && num[2] == 'f')
 		return (infinity = true), void();
+	if (num[0] == 'n' && num[1] == 'a' && num[2] == 'n')
+		return (nan = true), void();
 	while (*num >= '0' && *num <= '9')
 		number.push_back(*(num++) - '0');
 	afterDot = 0uLL;
@@ -645,10 +786,13 @@ void Fractional::Assign(const wchar_t* num)
 {
 	if (num == nullptr)
 		return Assign(0uLL);
-	negative = (num[0] == '-') ? (num++, true) : (false);
+	infinity = nan = false;
+	negative = (num[0] == L'-') ? (num++, true) : (false);
 	number.clear();
 	if (num[0] == L'i' && num[1] == L'n' && num[2] == L'f')
 		return (infinity = true), void();
+	if (num[0] == L'n' && num[1] == L'a' && num[2] == L'n')
+		return (nan = true), void();
 	while (*num >= L'0' && *num <= L'9')
 		number.push_back(*(num++) - L'0');
 	afterDot = 0uLL;
@@ -666,7 +810,8 @@ void Fractional::Assign(const wchar_t* num)
 void Fractional::Assign(long long num)
 {
 	negative = (num < 0LL);
-	infinity = false;
+	infinity = nan = false;
+	afterDot = 0uLL;
 	number.clear();
 	do
 	{
@@ -676,7 +821,8 @@ void Fractional::Assign(long long num)
 }
 void Fractional::Assign(unsigned long long num)
 {
-	negative = infinity = false;
+	negative = infinity = nan = false;
+	afterDot = 0uLL;
 	number.clear();
 	do
 	{
@@ -686,12 +832,21 @@ void Fractional::Assign(unsigned long long num)
 }
 void Fractional::Assign(long double val)
 {
-	infinity = isinf(val);
 	negative = (val < 0.l);
+	afterDot = nan = infinity = false;
 	number.clear();
-	if (infinity)
+	if (isnan(val))
+	{
+		nan = true;
+		number.push_back('\000');
 		return;
-
+	}
+	if (isinf(val))
+	{
+		infinity = true;
+		number.push_back('\000');
+		return;
+	}
 	long long tail = std::abs(static_cast<long long>(modfl(val, &val) * 10000000000000000.l));
 	while (tail % 10 == 0 && tail != 0)tail /= 10;
 	while (tail != 0)
@@ -714,7 +869,8 @@ Fractional& Fractional::operator=(const Fractional& other)
 	negative = other.negative;
 	infinity = other.infinity;
 	afterDot = other.afterDot;
-	number = infinity ? DecVector{} : other.number;
+	nan = other.nan;
+	number = (infinity || nan) ? DecVector{} : other.number;
 	return *this;
 }
 
@@ -775,7 +931,9 @@ std::string			Fractional::ToString()	const
 {
 	std::string res = "";
 	if (infinity)
-		return (negative ? ("-inf") : ("inf"));;
+		return (negative ? ("-inf") : ("inf"));
+	if (nan)
+		return (negative) ? ("-nan") : ("nan");
 	for (size_t i = 0; i < afterDot; i++)
 		res += number[i] + '0';
 	if (afterDot != 0)
@@ -790,12 +948,14 @@ std::string			Fractional::ToString()	const
 }
 bool				Fractional::ToBool()	const
 {
-	return !((number.size() - afterDot < 2) && (number[afterDot] == '\000') && !infinity);
+	return !Null();
 }
 long long			Fractional::ToLLong()	const
 {
 	if (infinity)
 		return negative ? std::numeric_limits<long long>::min() : std::numeric_limits<long long>::max();
+	if (nan)
+		return long long{};
 	long long res = 0;
 	const size_t maxSize = static_cast<size_t>(std::log10(std::numeric_limits<long long>::max())) + 1;
 	for (size_t i = 0; i < std::min(number.size() - afterDot, maxSize); i++)
@@ -806,6 +966,8 @@ unsigned long long	Fractional::ToULLong()	const
 {
 	if (infinity)
 		return negative ? std::numeric_limits<unsigned long long>::min() : std::numeric_limits<unsigned long long>::max();
+	if (nan)
+		return unsigned long long{};
 	unsigned long long res = 0;
 	const size_t maxSize = static_cast<size_t>(std::log10(std::numeric_limits<long long>::max()));
 	for (size_t i = 0; i < std::min(number.size() - afterDot, maxSize); i++)
@@ -816,6 +978,8 @@ long double			Fractional::ToLDouble() const
 {
 	if (infinity)
 		return negative ? (-1.l / sin(0)) : (1.l / sin(0));
+	if (nan)
+		return negative ? (-1.l / sin(0) * 0.l) : (1.l / sin(0) * 0.l);
 	long double res = 0.l;
 	const size_t maxSize = static_cast<size_t>(std::log10(std::numeric_limits<long double>::max())) + 1;
 	for (size_t i = 0; i < std::min(number.size() - afterDot, maxSize); i++)
@@ -831,6 +995,8 @@ Integer				Fractional::ToInteger() const
 	for (size_t i = afterDot; i < number.size(); i++)
 		res.number.push_back(number[i]);
 	res.negative = negative;
+	res.infinity = infinity;
+	res.nan = nan;
 	return res;
 }
 
@@ -840,19 +1006,26 @@ Integer				Fractional::ToInteger() const
 
 bool Fractional::Null() const
 {
-	return (infinity) ? (false) : ((afterDot == 0) && (number.size() < 2) && (number[0] == '\000'));
+	return ((number.size() == 0) || (number.size() == 1 && number[0] == '\000')) && !(nan || infinity || afterDot != 0);
 }
-
 bool Fractional::Negative() const
 {
 	return negative;
 }
+bool Fractional::Infinity() const
+{
+	return infinity;
+}
+bool Fractional::Nan() const
+{
+	return nan;
+}
 
 bool Fractional::operator==(const Fractional& other) const
 {
-	if (negative != other.negative || infinity != other.infinity || afterDot != other.afterDot || number.size() != other.number.size())
+	if (negative != other.negative || infinity != other.infinity || afterDot != other.afterDot || number.size() != other.number.size() || (nan || other.nan))
 		return false;
-	if (infinity && other.infinity && (negative == other.negative))
+	if (infinity && other.infinity)
 		return true;
 	for (size_t i = 0; i < number.size(); i++)
 		if (number[i] != other.number[i])
@@ -865,10 +1038,16 @@ bool Fractional::operator!=(const Fractional& other) const
 }
 bool Fractional::operator<(const Fractional& other) const
 {
+	if (nan || other.nan)
+		return (negative == other.negative) ? (false) : (negative);
 	if (negative != other.negative)
 		return negative;
-	if (infinity)
-		return (other.infinity) ? false : negative;
+	if (infinity || other.infinity)
+	{
+		if (infinity && other.infinity)
+			return false;
+		return negative ? (infinity) : (!infinity);
+	}
 	if ((number.size() - afterDot) != (other.number.size() - other.afterDot))
 		return (number.size() - afterDot) > (other.number.size() - other.afterDot) ? (negative) : (!negative);
 	for (size_t i = 0; i < number.size() - afterDot; i++)
@@ -888,10 +1067,16 @@ bool Fractional::operator<(const Fractional& other) const
 }
 bool Fractional::operator>(const Fractional& other) const
 {
+	if (nan || other.nan)
+		return (negative == other.negative) ? (false) : (other.negative);
 	if (negative != other.negative)
 		return !negative;
-	if (infinity)
-		return (other.infinity) ? false : !negative;
+	if (infinity || other.infinity)
+	{
+		if (infinity && other.infinity)
+			return false;
+		return negative ? (other.infinity) : (!other.infinity);
+	}
 	if ((number.size() - afterDot) != (other.number.size() - other.afterDot))
 		return (number.size() - afterDot) < (other.number.size() - other.afterDot) ? (negative) : (!negative);
 	for (size_t i = 0; i < number.size() - afterDot; i++)
@@ -925,8 +1110,7 @@ bool Fractional::operator>=(const Fractional& other) const
 Fractional Fractional::operator-() const
 {
 	auto res = *this;
-	res.negative = !negative;
-	return res;
+	return res.MadeOpposite();
 }
 
 Fractional Fractional::operator+(const Fractional& other) const
@@ -1000,7 +1184,7 @@ Fractional Fractional::operator*(const Fractional& other) const
 
 Fractional& Fractional::MadeOpposite()
 {
-	negative = !negative;
+	negative = Null() ? false : !negative;
 	return *this;
 }
 
@@ -1032,36 +1216,36 @@ Fractional operator""_fb(const char* str, const size_t size)
 
 namespace math
 {
-	Integer pow(const Integer& a, const Integer& b)
-	{
-	if (b.Negative())
-		return 0_b;
-	Integer res = 1;
-	for (Integer i = 0_b; i < b; i++)
-		res *= a;
-	return res;
-	}
-	Integer fact(const Integer& a)
-	{
-	if (a.Negative() || a.Null())
-		return 0_b;
-	Integer res = 1;
-	for (Integer i = 1_b; i <= a; i++)
-		res *= i;
-	return res;
-	}
-	Integer abs(Integer val)
-	{
-		return val.Negative() ? val.MadeOpposite() : val;
-	}
-
 	Integer min(const Integer& a, const Integer& b)
 	{
-	return (a < b) ? a : b;
+		return (a < b) ? a : b;
 	}
 	Integer max(const Integer& a, const Integer& b)
 	{
-	return (a > b) ? a : b;
+		return (a > b) ? a : b;
+	}
+	Integer abs(const Integer& val)
+	{
+		return val.Negative() ? -val : val;
+	}
+
+	Integer pow(const Integer& a, const Integer& b)
+	{
+		if (b.Negative())
+			return 0_b;
+		Integer res = 1;
+		for (Integer i = 0_b; i < b; i++)
+			res *= a;
+		return res;
+	}
+	Integer fact(const Integer& a)
+	{
+		if (a.Negative() || a.Null())
+			return 0_b;
+		Integer res = 1;
+		for (Integer i = 1_b; i <= a; i++)
+			res *= i;
+		return res;
 	}
 
 	bool prime(const Integer& num)
