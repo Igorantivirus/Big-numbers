@@ -20,7 +20,107 @@ static void multiplication(const DecVector& left, const DecVector& rigth, DecVec
 	}
 }
 
-//static void division
+namespace division
+{
+	static bool less(const DecVector& left, const DecVector& right)
+	{
+		if (left.size() != right.size())
+			return left.size() < right.size();
+		for (size_t i = left.size(); i > 0; --i)
+			if (left[i - 1] != right[i - 1])
+				return left[i - 1] < right[i - 1];
+		return false;
+	}
+	static bool more(const DecVector& left, const DecVector& right)
+	{
+		if (left.size() != right.size())
+			return left.size() > right.size();
+		for (size_t i = left.size(); i > 0; --i)
+			if (left[i - 1] != right[i - 1])
+				return left[i - 1] > right[i - 1];
+		return false;
+	}
+
+	static void smal_multiplication(DecVector& a, const char s)
+	{
+		a.resize(a.size() + 1);
+		char plus = 0;
+		for (size_t i = 0; i < a.size(); i++)
+		{
+			a[i] = a[i] * s + plus;
+			plus = 0;
+			if (a[i] > 9)
+			{
+				plus = a[i] / 10;
+				a[i] %= 10;
+			}
+		}
+		while (a.back() == '\000')
+			a.pop_back();
+	}
+
+	static void fill_pr(DecVector& pr, const DecVector& left, const DecVector& right)
+	{
+		pr.clear();
+		for (size_t i = 1; i <= right.size() && (left.size() - i) < left.size() ; i++)
+			pr.push_back(left[left.size() - i]);
+		pr.reverse();
+		if (less(pr, right) && left.size() > right.size() && pr.back() != '\000')
+			pr.push_begin(left[left.size() - right.size() - 1]);
+	}
+
+	static void find_pr_mul(DecVector& pr_mul, char& prC, const DecVector& pr, const DecVector& right)
+	{
+		for (prC = 9; prC >= 0; prC--)
+		{
+			pr_mul = right;
+			smal_multiplication(pr_mul, prC);
+			if (!more(pr_mul, pr))
+				break;
+		}
+	}
+
+	static void minus_equal(DecVector& left, const DecVector& right)
+	{
+		for (size_t i = 0; i < std::min(left.size(), right.size()); i++)
+		{
+			left[i] -= right[i];
+			if (left[i] < '\000')
+			{
+				--left[i + 1];
+				left[i] += 10;
+			}
+		}
+		while (left.back() == '\000')
+			left.pop_back();
+	}
+
+	static void division(const DecVector& left, const DecVector& right, DecVector& res, DecVector& pr)
+	{
+		char prC;
+		size_t i = 0;
+		DecVector pr_mul;
+		fill_pr(pr, left, right);
+		i += pr.size();
+		res.clear();
+		while (i <= left.size())
+		{
+			find_pr_mul(pr_mul, prC, pr, right);
+			res.push_back(prC);
+			minus_equal(pr, pr_mul);
+			if(i != left.size())
+				pr.push_begin(left[left.size() - i - 1]);	
+			++i;
+		}
+		res.reverse();
+	}
+
+	static void division(const DecVector& left, const DecVector& right, DecVector& res)
+	{
+		DecVector pr;
+		division(left, right, res, pr);
+	}
+}
 
 #pragma region class Integer
 
@@ -309,7 +409,7 @@ Integer Integer::operator-(const Integer& other) const
 Integer Integer::operator*(const Integer& other) const
 {
 	if (Null() || other.Null())
-		return Integer{0};
+		return Integer{};
 	Integer res;
 	multiplication(number, other.number, res.number);
 	res.RemoveLastZeros();
@@ -318,14 +418,13 @@ Integer Integer::operator*(const Integer& other) const
 }
 Integer Integer::operator/(const Integer& other) const
 {
-	Integer current;
-	return Div(other, current);
+	Integer res = *this;
+	return res /= other;
 }
 Integer Integer::operator%(const Integer& other) const
 {
-	Integer current;
-	void(Div(other, current));
-	return current;
+	Integer res = *this;
+	return res %= other;
 }
 
 Integer& Integer::operator+=(const Integer& other)
@@ -377,80 +476,36 @@ Integer& Integer::operator*=(const Integer& other)
 }
 Integer& Integer::operator/=(const Integer& other)
 {
-	return this->operator=(this->operator/(other));
+	if (Null())
+	{
+		negative = false;
+		return *this;
+	}
+	if (other.Null())
+		throw std::logic_error("Division by null.");
+	DecVector res;
+	division::division(number,other.number, res);
+	number = res;
+	negative = negative != other.negative;
+	return *this;
 }
 Integer& Integer::operator%=(const Integer& other)
 {
-	return this->operator=(this->operator%(other));
-}
-
-Integer Integer::Div(const Integer& other, Integer& current) const
-{
-	if (other.Null())
-		throw "divide by zero.";
-	if (Null() || abs(*this).operator<(abs(other)))
-		return 0_b;
-	Integer result, b = other;
-	b.negative = false;
-	result.number.resize(number.size());
-	int x, l, r, m;
-	for (size_t i = number.size(); i > 0; i--)
+	if (Null())
 	{
-		current.ShiftRight();
-		current.number[0] = number[i - 1];
-		current.RemoveLastZeros();
-		x = 0, l = 0, r = 10;
-		while (l <= r)
-		{
-			m = (l + r) / 2;
-			if ((b * m) <= current)
-				(x = m), (l = m + 1);
-			else
-				r = m - 1;
-		}
-		result.number[i - 1] = x;
-		current = current - b * x;
+		negative = false;
+		return *this;
 	}
-	result.negative = negative != other.negative && !result.Null();
-	result.RemoveLastZeros();
-	return result;
+	if (other.Null())
+		throw std::logic_error("Dividing by null.");
+	DecVector res, pr;
+	division::division(number, other.number, res, pr);
+	number = pr;
+	if (number.empty())
+		number.push_back('\000');
+	negative = false;
+	return *this;
 }
-
-
-
-
-//Integer Integer::Div(const Integer& other, Integer& current) const
-//{
-//	if (other.Null())
-//		throw "divide by zero.";
-//	if (Null() || abs(*this).operator<(abs(other)))
-//		return 0_b;
-//	Integer result, t, b = other;
-//	b.negative = false;
-//	result.number.resize(number.size());
-//	int x, l, r, m;
-//	for (size_t i = number.size(); i > 0; i--)
-//	{
-//		current.ShiftRight();
-//		current.number[0] = number[i - 1];
-//		current.RemoveLastZeros();
-//		x = 0, l = 0, r = 10;
-//		while (l <= r)
-//		{
-//			m = (l + r) / 2;
-//			t = b * m;
-//			if (t <= current)
-//				(x = m), (l = m + 1);
-//			else
-//				r = m - 1;
-//		}
-//		result.number[i - 1] = x;
-//		current = current - b * x;
-//	}
-//	result.negative = negative != other.negative && !result.Null();
-//	result.RemoveLastZeros();
-//	return result;
-//}
 
 #pragma endregion
 
@@ -487,18 +542,9 @@ Integer& Integer::MadeOpposite()
 	return *this;
 }
 
-void Integer::ShiftRight()
-{
-	if (number.size() == 0)
-		return number.push_back(0);
-	number.push_back(number.back());
-	for (size_t i = number.size() - 2; i > 0; --i) number[i] = number[i - 1];
-	number[0] = 0;
-}
-
 void Integer::RemoveLastZeros()
 {
-	while (number.back() == '\000' && number.size() != 1)
+	while (number.back() == '\000' && number.size() > 1uLL)
 		number.pop_back();
 }
 
@@ -725,7 +771,7 @@ Fractional::operator Integer() const
 	return ToInteger();
 }
 
-std::string Fractional::ToString() const
+std::string			Fractional::ToString()	const
 {
 	std::string res = "";
 	if (infinity)
@@ -742,11 +788,11 @@ std::string Fractional::ToString() const
 		std::swap(res[i], res[res.size() - i - 1]);
 	return res;
 }
-bool Fractional::ToBool() const
+bool				Fractional::ToBool()	const
 {
 	return !((number.size() - afterDot < 2) && (number[afterDot] == '\000') && !infinity);
 }
-long long Fractional::ToLLong() const
+long long			Fractional::ToLLong()	const
 {
 	if (infinity)
 		return negative ? std::numeric_limits<long long>::min() : std::numeric_limits<long long>::max();
@@ -756,7 +802,7 @@ long long Fractional::ToLLong() const
 		res += ((negative) ? (-number[i + afterDot]) : (number[i + afterDot])) * static_cast<long long>(std::pow(10, i));
 	return res;
 }
-unsigned long long Fractional::ToULLong() const
+unsigned long long	Fractional::ToULLong()	const
 {
 	if (infinity)
 		return negative ? std::numeric_limits<unsigned long long>::min() : std::numeric_limits<unsigned long long>::max();
@@ -766,7 +812,7 @@ unsigned long long Fractional::ToULLong() const
 		res += number[i + afterDot] * static_cast<size_t>(std::pow(10, i));
 	return res;
 }
-long double Fractional::ToLDouble() const
+long double			Fractional::ToLDouble() const
 {
 	if (infinity)
 		return negative ? (-1.l / sin(0)) : (1.l / sin(0));
@@ -778,7 +824,7 @@ long double Fractional::ToLDouble() const
 		res += ((negative) ? (-number[i - 1]) : (number[i - 1])) / std::pow(10, afterDot - i + 1);
 	return res;
 }
-Integer Fractional::ToInteger() const
+Integer				Fractional::ToInteger() const
 {
 	Integer res;
 	res.number.clear();
@@ -791,6 +837,16 @@ Integer Fractional::ToInteger() const
 #pragma endregion
 
 #pragma region bool operators
+
+bool Fractional::Null() const
+{
+	return (infinity) ? (false) : ((afterDot == 0) && (number.size() < 2) && (number[0] == '\000'));
+}
+
+bool Fractional::Negative() const
+{
+	return negative;
+}
 
 bool Fractional::operator==(const Fractional& other) const
 {
@@ -863,6 +919,8 @@ bool Fractional::operator>=(const Fractional& other) const
 }
 
 #pragma endregion
+
+#pragma region math operators
 
 Fractional Fractional::operator-() const
 {
@@ -938,9 +996,12 @@ Fractional Fractional::operator*(const Fractional& other) const
 	return res;
 }
 
-bool Fractional::Null() const
+#pragma endregion
+
+Fractional& Fractional::MadeOpposite()
 {
-	return (infinity) ? (false) : ((afterDot == 0) && (number.size() < 2) && (number[0] == '\000'));
+	negative = !negative;
+	return *this;
 }
 
 void Fractional::RemoveLastZeros()
@@ -969,39 +1030,52 @@ Fractional operator""_fb(const char* str, const size_t size)
 
 #pragma endregion
 
-#pragma region math
-
-Integer pow(const Integer& a, const Integer& b)
+namespace math
 {
+	Integer pow(const Integer& a, const Integer& b)
+	{
 	if (b.Negative())
 		return 0_b;
 	Integer res = 1;
 	for (Integer i = 0_b; i < b; i++)
 		res *= a;
 	return res;
-}
-Integer fact(const Integer& a)
-{
+	}
+	Integer fact(const Integer& a)
+	{
 	if (a.Negative() || a.Null())
 		return 0_b;
 	Integer res = 1;
 	for (Integer i = 1_b; i <= a; i++)
 		res *= i;
 	return res;
-}
-Integer abs(Integer val)
-{
-	val.negative = false;
-	return val;
-}
+	}
+	Integer abs(Integer val)
+	{
+		return val.Negative() ? val.MadeOpposite() : val;
+	}
 
-Integer min(const Integer& a, const Integer& b)
-{
+	Integer min(const Integer& a, const Integer& b)
+	{
 	return (a < b) ? a : b;
-}
-Integer max(const Integer& a, const Integer& b)
-{
+	}
+	Integer max(const Integer& a, const Integer& b)
+	{
 	return (a > b) ? a : b;
-}
+	}
 
-#pragma endregion
+	bool prime(const Integer& num)
+	{
+		if (num.Negative() || num.Null())
+			return false;
+		if (num == 2_b)
+			return true;
+		auto pr = static_cast<short>(num % 10);
+		if (pr % 2 == 0 || pr % 5 == 0 || num == 1_b)
+			return false;
+		for (Integer i = 3; i < num; i += 2_b)
+			if ((num % i).Null())
+				return false;
+		return true;
+	}
+}

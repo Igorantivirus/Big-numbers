@@ -163,7 +163,6 @@ void DecVector::pop_begin()
 	for (size_t i = 0; i < _size; i++)
 		_dec[i] = _dec[i + 1];
 	_size--;
-	_size--;
 }
 
 void DecVector::reverse()

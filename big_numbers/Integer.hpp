@@ -85,8 +85,6 @@ public:
 	friend std::ostream& operator<<(std::ostream& out, const Integer& num);
 	friend std::istream& operator>>(std::istream& in, Integer& num);
 
-	friend Integer abs(Integer val);
-
 private:
 	DecVector number;
 	bool negative = false;
@@ -101,11 +99,7 @@ private:
 	unsigned long long ToULLong() const;
 	std::string ToString() const;
 
-	void ShiftRight();
-
 	void RemoveLastZeros();
-
-	Integer Div(const Integer& other, Integer& current) const;
 };
 
 class Fractional
@@ -154,6 +148,10 @@ public:
 
 #pragma region bool operators
 
+	bool Null() const;
+
+	bool Negative() const;
+
 	bool operator==(const Fractional& other) const;
 	bool operator!=(const Fractional& other) const;
 	bool operator<(const Fractional& other) const;
@@ -174,7 +172,7 @@ public:
 
 #pragma endregion
 
-	bool Null() const;
+	Fractional& MadeOpposite();
 
 	friend std::ostream& operator<<(std::ostream& out, const Fractional& val);
 
@@ -206,9 +204,14 @@ Integer operator""_b(const char* str, const size_t size);
 Fractional operator""_fb(const unsigned long long int val);
 Fractional operator""_fb(const char* str, const size_t size);
 
-Integer pow(const Integer& a, const Integer& b);
-Integer fact(const Integer& a);
-Integer abs(Integer val);
+namespace math
+{
+	Integer pow(const Integer& a, const Integer& b);
+	Integer fact(const Integer& a);
+	Integer abs(Integer val);
 
-Integer min(const Integer& a, const Integer& b);
-Integer max(const Integer& a, const Integer& b);
+	Integer min(const Integer& a, const Integer& b);
+	Integer max(const Integer& a, const Integer& b);
+	bool prime(const Integer& bum);
+
+}
