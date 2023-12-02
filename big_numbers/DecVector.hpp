@@ -38,6 +38,8 @@ public:
 	void pop_back();
 	void pop_begin();
 
+	void push_begin_count(size_t count);
+
 	void reverse();
 
 private:

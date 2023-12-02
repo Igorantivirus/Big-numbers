@@ -8,15 +8,18 @@
 class Integer
 {
 	friend class Fractional;
+	friend class Math;
 public:
 
 #pragma region Initialized
 
 	Integer();
 	Integer(const bool val);
+	Integer(const char val);
 	Integer(const short val);
 	Integer(const int val);
 	Integer(const long long val);
+	Integer(const unsigned char val);
 	Integer(const unsigned short val);
 	Integer(const unsigned int val);
 	Integer(const unsigned long long val);
@@ -34,6 +37,8 @@ public:
 
 	bool Null() const;
 	bool Negative() const;
+	bool Infinity() const;
+	bool Nan() const;
 
 	bool operator==(const Integer& other) const;
 	bool operator!=(const Integer& other) const;
@@ -47,9 +52,11 @@ public:
 #pragma region Convert
 
 	explicit operator bool() const;
+	explicit operator char() const;
 	explicit operator short() const;
 	explicit operator int() const;
 	explicit operator long long() const;
+	explicit operator unsigned char() const;
 	explicit operator unsigned short() const;
 	explicit operator unsigned int() const;
 	explicit operator unsigned long long() const;
@@ -88,6 +95,8 @@ public:
 private:
 	DecVector number;
 	bool negative = false;
+	bool infinity = false;
+	bool nan = false;
 
 	void Assign(const long long num);
 	void Assign(const unsigned long long num);
@@ -100,19 +109,25 @@ private:
 	std::string ToString() const;
 
 	void RemoveLastZeros();
+
+	static Integer FabrickInfinity(bool negative);
+	static Integer FabrickNan(bool negative);
 };
 
 class Fractional
 {
+	friend class Math;
 public:
 
 #pragma region Initialization
 
 	Fractional();
 	Fractional(const bool val);
+	Fractional(const char val);
 	Fractional(const short val);
 	Fractional(const int val);
 	Fractional(const long long val);
+	Fractional(const unsigned char val);
 	Fractional(const unsigned short val);
 	Fractional(const unsigned int val);
 	Fractional(const unsigned long long val);
@@ -132,11 +147,13 @@ public:
 #pragma region Convert
 
 	explicit operator bool() const;
-	explicit operator int() const;
+	explicit operator char() const;
 	explicit operator short() const;
+	explicit operator int() const;
 	explicit operator long long() const;
-	explicit operator unsigned int() const;
+	explicit operator unsigned char() const;
 	explicit operator unsigned short() const;
+	explicit operator unsigned int() const;
 	explicit operator unsigned long long() const;
 	explicit operator float() const;
 	explicit operator double() const;
@@ -149,8 +166,9 @@ public:
 #pragma region bool operators
 
 	bool Null() const;
-
 	bool Negative() const;
+	bool Infinity() const;
+	bool Nan() const;
 
 	bool operator==(const Fractional& other) const;
 	bool operator!=(const Fractional& other) const;
@@ -168,11 +186,20 @@ public:
 	Fractional operator+(const Fractional& other) const;
 	Fractional operator-(const Fractional& other) const;
 	Fractional operator*(const Fractional& other) const;
+	Fractional operator/(const Fractional& other) const;
 
+	Fractional& operator+=(const Fractional& other);
+	Fractional& operator-=(const Fractional& other);
+	Fractional& operator*=(const Fractional& other);
+	Fractional& operator/=(const Fractional& other);
 
 #pragma endregion
 
 	Fractional& MadeOpposite();
+
+	size_t AfterDot() const;
+	size_t MaxSignsAfterDotDiving() const;
+	void SetMaxSignsAfterDotDiving(size_t val);
 
 	friend std::ostream& operator<<(std::ostream& out, const Fractional& val);
 
@@ -181,6 +208,9 @@ private:
 	size_t afterDot = 0;
 	bool negative = false;
 	bool infinity = false;
+	bool nan = false;
+
+	size_t maxAfterDot = 10;
 
 	void Assign(const char* val);
 	void Assign(const wchar_t* val);
@@ -196,6 +226,11 @@ private:
 	Integer ToInteger() const;
 
 	void RemoveLastZeros();
+
+	void Multi10pow(size_t count);
+
+	static Fractional FabrickNan(bool negative);
+	static Fractional FabrickInfinity(bool negative);
 };
 
 Integer operator""_b(const unsigned long long int val);
@@ -204,14 +239,31 @@ Integer operator""_b(const char* str, const size_t size);
 Fractional operator""_fb(const unsigned long long int val);
 Fractional operator""_fb(const char* str, const size_t size);
 
-namespace math
+class Math
 {
-	Integer pow(const Integer& a, const Integer& b);
-	Integer fact(const Integer& a);
-	Integer abs(Integer val);
+public:
 
-	Integer min(const Integer& a, const Integer& b);
-	Integer max(const Integer& a, const Integer& b);
-	bool prime(const Integer& bum);
+#pragma region basicks
 
-}
+	static Integer min(const Integer& a, const Integer& b);
+	static Integer max(const Integer& a, const Integer& b);
+
+	static Fractional min(const Fractional& a, const Fractional& b);
+	static Fractional max(const Fractional& a, const Fractional& b);
+
+	static Integer abs(const Integer& val);
+	static Fractional abs(const Fractional& val);
+
+#pragma endregion
+
+	static Integer pow(const Integer& a, const Integer& b);
+	static Fractional pow(const Fractional& a, const Integer& b);
+	
+	static Fractional exp(const Fractional& x, const Fractional& epsilon);
+	static Fractional exp(const Integer& x);
+	static Fractional exp(const Fractional& x);
+
+	static Integer fact(const Integer& a);
+	static bool prime(const Integer& bum);
+
+};

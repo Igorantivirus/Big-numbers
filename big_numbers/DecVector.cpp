@@ -73,6 +73,8 @@ void DecVector::erase(size_t begin, size_t count)
 {
 	if (count == 0)
 		return;
+	if ((count - begin) >= _size)
+		return clear();
 	for (size_t i = begin + count; i < _size; i++)
 		_dec[i - count] = _dec[i];
 	if(begin < _size)
@@ -164,6 +166,18 @@ void DecVector::pop_begin()
 		_dec[i] = _dec[i + 1];
 	_size--;
 }
+
+void DecVector::push_begin_count(size_t count)
+{
+	reserve(_size + count);
+	for (size_t i = _size; i > 0; --i)
+	{
+		_dec[i + count - 1] = _dec[i - 1];
+		_dec[i - 1] = '\000';
+	}
+	_size += count;
+}
+
 
 void DecVector::reverse()
 {
