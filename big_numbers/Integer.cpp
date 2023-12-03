@@ -127,42 +127,6 @@ namespace division
 #pragma region Initialized
 
 Integer::Integer() : number{1} {}
-Integer::Integer(const bool val)
-{
-	Assign(static_cast<long long>(val));
-}
-Integer::Integer(const char val)
-{
-	Assign(static_cast<long long>(val));
-}
-Integer::Integer(const short val)
-{
-	Assign(static_cast<long long>(val));
-}
-Integer::Integer(const int val)
-{
-	Assign(static_cast<long long>(val));
-}
-Integer::Integer(const long long val)
-{
-	Assign(static_cast<long long>(val));
-}
-Integer::Integer(const unsigned short val)
-{
-	Assign(static_cast<unsigned long long>(val));
-}
-Integer::Integer(const unsigned char val)
-{
-	Assign(static_cast<unsigned long long>(val));
-}
-Integer::Integer(const unsigned int val)
-{
-	Assign(static_cast<unsigned long long>(val));
-}
-Integer::Integer(const unsigned long long val)
-{
-	Assign(static_cast<unsigned long long>(val));
-}
 Integer::Integer(const char* val)
 {
 	Assign(val);
@@ -263,7 +227,7 @@ Integer& Integer::operator=(Integer&& other) noexcept
 
 bool Integer::Null() const
 {
-	return ((number.size() == 0) || (number.size() == 1 && number[0] == '\000')) && !(nan || infinity);
+	return ((number.empty()) || (number.size() == 1 && number[0] == '\000')) && !(nan || infinity);
 }
 bool Integer::Negative() const
 {
@@ -357,7 +321,7 @@ long long			Integer::ToLLong() const
 		return negative ? std::numeric_limits<long long>::min() : std::numeric_limits<long long>::max();
 	const size_t maxSize = static_cast<size_t>(std::log10(std::numeric_limits<long long>::max())) + 1;
 	for (size_t i = 0; i < std::min(number.size(), maxSize); i++)
-		res += ((negative) ? (number[i]) : (number[i])) * static_cast<size_t>(std::pow(10, i));
+		res += ((negative) ? (-number[i]) : (number[i])) * static_cast<size_t>(std::pow(10, i));
 	return res;
 }
 unsigned long long	Integer::ToULLong() const
@@ -694,54 +658,6 @@ Integer operator""_b(const char* str, const size_t size)
 #pragma region Initialization
 
 Fractional::Fractional() {}
-Fractional::Fractional(const bool val) 
-{
-	Assign(static_cast<long long>(val));
-}
-Fractional::Fractional(const char val) 
-{
-	Assign(static_cast<long long>(val));
-}
-Fractional::Fractional(const short val) 
-{
-	Assign(static_cast<long long>(val));
-}
-Fractional::Fractional(const int val) 
-{
-	Assign(static_cast<long long>(val));
-}
-Fractional::Fractional(const long long val) 
-{
-	Assign(val);
-}
-Fractional::Fractional(const unsigned char val) 
-{
-	Assign(static_cast<unsigned long long>(val));
-}
-Fractional::Fractional(const unsigned short val) 
-{
-	Assign(static_cast<unsigned long long>(val));
-}
-Fractional::Fractional(const unsigned int val) 
-{
-	Assign(static_cast<unsigned long long>(val));
-}
-Fractional::Fractional(const unsigned long long val) 
-{
-	Assign(val);
-}
-Fractional::Fractional(const float val) 
-{
-	Assign(static_cast<long double>(val));
-}
-Fractional::Fractional(const double val) 
-{
-	Assign(static_cast<long double>(val));
-}
-Fractional::Fractional(const long double val) 
-{
-	Assign(val);
-}
 Fractional::Fractional(const char* val) 
 {
 	Assign(val);
@@ -930,11 +846,11 @@ Fractional::operator Integer() const
 
 std::string			Fractional::ToString()	const
 {
-	std::string res = "";
+	std::string res;
 	if (infinity)
-		return (negative ? ("-inf") : ("inf"));
+		return negative ? "-inf" : "inf";
 	if (nan)
-		return (negative) ? ("-nan") : ("nan");
+		return negative ? "-nan" : "nan";
 	for (size_t i = 0; i < afterDot; i++)
 		res += number[i] + '0';
 	if (afterDot != 0)
@@ -960,7 +876,7 @@ long long			Fractional::ToLLong()	const
 	long long res = 0;
 	const size_t maxSize = static_cast<size_t>(std::log10(std::numeric_limits<long long>::max())) + 1;
 	for (size_t i = 0; i < std::min(number.size() - afterDot, maxSize); i++)
-		res += ((negative) ? (-number[i + afterDot]) : (number[i + afterDot])) * static_cast<long long>(std::pow(10, i));
+		res += negative ? -number[i + afterDot] : number[i + afterDot] * static_cast<long long>(std::pow(10, i));
 	return res;
 }
 unsigned long long	Fractional::ToULLong()	const
@@ -984,9 +900,9 @@ long double			Fractional::ToLDouble() const
 	long double res = 0.l;
 	const size_t maxSize = static_cast<size_t>(std::log10(std::numeric_limits<long double>::max())) + 1;
 	for (size_t i = 0; i < std::min(number.size() - afterDot, maxSize); i++)
-		res += ((negative) ? (-number[i + afterDot]) : (number[i + afterDot])) * std::pow(10, i);
+		res += negative ? -number[i + afterDot] : number[i + afterDot] * std::pow(10, i);
 	for (size_t i = afterDot; i > 0; i--)
-		res += ((negative) ? (-number[i - 1]) : (number[i - 1])) / std::pow(10, afterDot - i + 1);
+		res += negative ? -number[i - 1] : number[i - 1] / std::pow(10, afterDot - i + 1);
 	return res;
 }
 Integer				Fractional::ToInteger() const
@@ -1007,7 +923,7 @@ Integer				Fractional::ToInteger() const
 
 bool Fractional::Null() const
 {
-	return ((number.size() == 0) || (number.size() == 1 && number[0] == '\000')) && !(nan || infinity || afterDot != 0);
+	return ((number.empty()) || (number.size() == 1 && number[0] == '\000')) && !(nan || infinity || afterDot != 0);
 }
 bool Fractional::Negative() const
 {
@@ -1273,9 +1189,10 @@ size_t Fractional::MaxSignsAfterDotDiving() const
 {
 	return maxAfterDot;
 }
-void Fractional::SetMaxSignsAfterDotDiving(size_t val)
+Fractional& Fractional::SetMaxSignsAfterDotDiving(size_t val)
 {
 	maxAfterDot = val;
+	return *this;
 }
 
 Fractional& Fractional::MadeOpposite()
@@ -1341,8 +1258,6 @@ Fractional operator""_fb(const char* str, const size_t size)
 
 #pragma region class Math
 
-#pragma region basicks
-
 Integer Math::min(const Integer& a, const Integer& b)
 {
 	return (a < b) ? a : b;
@@ -1370,7 +1285,81 @@ Fractional Math::abs(const Fractional& val)
 	return val.Negative() ? -val : val;
 }
 
-#pragma endregion
+Fractional Math::round(const Fractional& x, size_t afterDot)
+{
+	if (x.afterDot <= afterDot || x.nan || x.infinity)
+		return x;
+	Fractional res;
+	res.number.clear();
+	res.number.reserve(x.number.size() - (x.afterDot - afterDot));
+	for (size_t i = (x.afterDot - afterDot); i < x.number.size(); ++i)
+		res.number.push_back(x.number[i]);
+	res.negative = x.negative;
+	res.afterDot = afterDot;
+	if (x.number[(x.afterDot - afterDot - 1)] > 4)
+	{
+		++res.number[0];
+		for (size_t i = 0; i < res.number.size(); ++i)
+		{
+			if (res.number[i] > 9)
+			{
+				res.number[i] -= 10;
+				if (res.number.size() - 1 == i)
+					res.number.push_back('\000');
+				++res.number[i + 1];
+			}
+			else
+				break;
+		}
+	}
+	res.RemoveLastZeros();
+	return res;
+}
+Fractional Math::round(const Fractional& x)
+{
+	return round(x, 0);
+}
+Fractional Math::floor(const Fractional& x)
+{
+	if (x.afterDot == 0 || x.nan || x.infinity)
+		return x;
+	Fractional res;
+	res.number.clear();
+	res.number.reserve(x.number.size() - x.afterDot);
+	for (size_t i = x.afterDot; i < x.number.size(); ++i)
+		res.number.push_back(x.number[i]);
+	res.negative = x.negative;
+	if (res.negative)
+		res -= 1;
+	return res;
+}
+
+Fractional Math::modf(const Fractional a, Fractional* intpart)
+{
+	if (a.infinity || a.nan)
+		return a;
+	if (intpart != nullptr)
+	{
+		intpart->infinity = intpart->nan = false;
+		intpart->maxAfterDot = a.maxAfterDot;
+		intpart->afterDot = 0;
+		intpart->number.clear();
+		for (size_t i = a.afterDot; i < a.number.size(); ++i)
+			intpart->number.push_back(a.number[i]);
+		intpart->negative = a.negative;
+	}
+	Fractional res;
+	if (a.afterDot != 0)
+	{
+		res.number.clear();
+		for (size_t i = 0; i < a.afterDot; ++i)
+			res.number.push_back(a.number[i]);
+		res.number.push_back('\000');
+		res.afterDot = a.afterDot;
+		res.negative = a.negative;
+	}
+	return res;
+}
 
 Integer Math::pow(const Integer& a, const Integer& b)
 {
@@ -1403,16 +1392,17 @@ Fractional Math::pow(const Fractional& a, const Integer& b)
 	return res;
 }
 
-
-
 Fractional Math::exp(const Fractional& x, const Fractional& epsilon)
 {
+	if (x.nan || epsilon.nan)
+		return Fractional::FabrickNan(false);
+	if (x.infinity)
+		return x;
 	Fractional res = x + 1;
 	Fractional prX = x;
 	Fractional prF = 1;
 	Fractional term;
-	prF.SetMaxSignsAfterDotDiving(x.MaxSignsAfterDotDiving());
-	term.SetMaxSignsAfterDotDiving(x.MaxSignsAfterDotDiving());
+	prF.maxAfterDot = term.maxAfterDot = x.maxAfterDot;
 	Fractional i = 2;
 	while (true)
 	{
@@ -1435,6 +1425,44 @@ Fractional Math::exp(const Integer& x)
 	return exp(static_cast<Fractional>(x));
 }
 
+Fractional Math::ln(const Fractional& z, const Fractional& epsilon)
+{
+	if (z.negative || z.nan || epsilon.nan || z.Null())
+	{
+		Fractional res;
+		res.maxAfterDot = z.maxAfterDot;
+		res.nan = true;
+		res.negative = z.negative;
+		return res;
+	}
+	if (z.infinity)
+		return z;
+	Fractional x = (z - 1) / (z + 1);
+	Fractional res = x;
+	Fractional prX = x;
+	Fractional i = 1;
+	Fractional term;
+	term.maxAfterDot = z.maxAfterDot;
+	x *= x;
+	while (true)
+	{
+		prX *= x;
+		i += 2;
+		term = prX / i;
+		if (term < epsilon)
+			break;
+		res += term;
+	}
+	return res * 2;
+}
+Fractional Math::ln(const Fractional& x)
+{
+	return ln(x, "0.00001"_fb);
+}
+Fractional Math::ln(const Integer& x)
+{
+	return ln(static_cast<Fractional>(x));
+}
 
 Integer Math::fact(const Integer& a)
 {

@@ -14,15 +14,16 @@ public:
 #pragma region Initialized
 
 	Integer();
-	Integer(const bool val);
-	Integer(const char val);
-	Integer(const short val);
-	Integer(const int val);
-	Integer(const long long val);
-	Integer(const unsigned char val);
-	Integer(const unsigned short val);
-	Integer(const unsigned int val);
-	Integer(const unsigned long long val);
+	template<std::signed_integral T>
+	Integer(const T val)
+	{
+		Assign(static_cast<long long>(val));
+	}
+	template<std::unsigned_integral T>
+	Integer(const T val)
+	{
+		Assign(static_cast<unsigned long long>(val));
+	}
 	Integer(const char* val);
 	Integer(const wchar_t* val);
 	Integer(const Integer& other);
@@ -122,18 +123,21 @@ public:
 #pragma region Initialization
 
 	Fractional();
-	Fractional(const bool val);
-	Fractional(const char val);
-	Fractional(const short val);
-	Fractional(const int val);
-	Fractional(const long long val);
-	Fractional(const unsigned char val);
-	Fractional(const unsigned short val);
-	Fractional(const unsigned int val);
-	Fractional(const unsigned long long val);
-	Fractional(const float val);
-	Fractional(const double val);
-	Fractional(const long double val);
+	template<std::signed_integral T>
+	Fractional(const T val)
+	{
+		Assign(static_cast<long long>(val));
+	}
+	template<std::unsigned_integral T>
+	Fractional(const T val)
+	{
+		Assign(static_cast<unsigned long long>(val));
+	}
+	template<std::floating_point T>
+	Fractional(const T val)
+	{
+		Assign(static_cast<long double>(val));
+	}
 	Fractional(const char* val);
 	Fractional(const wchar_t* val);
 	Fractional(const Fractional& val);
@@ -199,7 +203,7 @@ public:
 
 	size_t AfterDot() const;
 	size_t MaxSignsAfterDotDiving() const;
-	void SetMaxSignsAfterDotDiving(size_t val);
+	Fractional& SetMaxSignsAfterDotDiving(size_t val);
 
 	friend std::ostream& operator<<(std::ostream& out, const Fractional& val);
 
@@ -243,8 +247,6 @@ class Math
 {
 public:
 
-#pragma region basicks
-
 	static Integer min(const Integer& a, const Integer& b);
 	static Integer max(const Integer& a, const Integer& b);
 
@@ -254,7 +256,11 @@ public:
 	static Integer abs(const Integer& val);
 	static Fractional abs(const Fractional& val);
 
-#pragma endregion
+	static Fractional round(const Fractional& x, size_t afterDot);
+	static Fractional round(const Fractional& x);
+	static Fractional floor(const Fractional& x);
+
+	static Fractional modf(const Fractional a, Fractional* frac);
 
 	static Integer pow(const Integer& a, const Integer& b);
 	static Fractional pow(const Fractional& a, const Integer& b);
@@ -262,6 +268,10 @@ public:
 	static Fractional exp(const Fractional& x, const Fractional& epsilon);
 	static Fractional exp(const Integer& x);
 	static Fractional exp(const Fractional& x);
+
+	static Fractional ln(const Fractional& z, const Fractional& epsilon);
+	static Fractional ln(const Fractional& x);
+	static Fractional ln(const Integer& x);
 
 	static Integer fact(const Integer& a);
 	static bool prime(const Integer& bum);
