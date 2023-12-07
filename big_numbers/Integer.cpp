@@ -40,6 +40,13 @@ namespace division
 				return left[i - 1] > right[i - 1];
 		return false;
 	}
+	static bool null(const DecVector& v)
+	{
+		for (size_t i = 0; i < v.size(); ++i)
+			if (v[i] != '\000')
+				return false;
+		return true;
+	}
 
 	static void smal_multiplication(DecVector& a, const char s)
 	{
@@ -71,6 +78,13 @@ namespace division
 
 	static void find_pr_mul(DecVector& pr_mul, char& prC, const DecVector& pr, const DecVector& right)
 	{
+		if (null(pr))
+		{
+			pr_mul.clear();
+			pr_mul.push_back('\000');
+			prC = '\000';
+			return;
+		}
 		for (prC = 9; prC >= 0; prC--)
 		{
 			pr_mul = right;
@@ -667,11 +681,11 @@ Fractional::Fractional(const wchar_t* val)
 	Assign(val);
 }
 Fractional::Fractional(const Fractional& val) :
-	number{ val.number }, afterDot{ val.afterDot }, negative{ val.negative }, infinity{ val.infinity }, maxAfterDot{val.maxAfterDot} {}
+	number{ val.number }, afterDot{ val.afterDot }, negative{ val.negative }, infinity{ val.infinity }, maxAfterDot{ val.maxAfterDot }, nan{val.nan} {}
 Fractional::Fractional(Fractional&& val) noexcept :
-	number{ val.number }, afterDot{ val.afterDot }, negative{ val.negative }, infinity{ val.infinity }, maxAfterDot{ val.maxAfterDot } {}
+	number{ val.number }, afterDot{ val.afterDot }, negative{ val.negative }, infinity{ val.infinity }, maxAfterDot{ val.maxAfterDot }, nan{val.nan} {}
 Fractional::Fractional(const Integer& val) :
-	number{ val.number }, negative{ val.negative }, infinity{ false }, afterDot{0} {}
+	number{ val.number }, negative{ val.negative }, infinity{ false }, afterDot{ 0 }, nan{val.nan} {}
 
 void Fractional::Assign(const char* num)
 {
@@ -908,9 +922,15 @@ long double			Fractional::ToLDouble() const
 Integer				Fractional::ToInteger() const
 {
 	Integer res;
-	res.number.clear();
-	for (size_t i = afterDot; i < number.size(); i++)
-		res.number.push_back(number[i]);
+	if (afterDot == 0)
+		res.number = number;
+	else
+	{
+		res.number.clear();
+		res.number.reserve(number.size() - afterDot);
+		for (size_t i = afterDot; i < number.size(); i++)
+			res.number.push_back(number[i]);
+	}
 	res.negative = negative;
 	res.infinity = infinity;
 	res.nan = nan;
@@ -1253,10 +1273,26 @@ Fractional operator""_fb(const char* str, const size_t size)
 {
 	return Fractional{ str };
 }
+Fractional operator""_fb(const long double val)
+{
+	return Fractional{ val };
+}
 
 #pragma endregion
 
 #pragma region class Math
+
+Fractional Math::defaultEpsilon = "0.00001";
+
+Fractional	Math::GetEpsolon()
+{
+	return defaultEpsilon;
+}
+void		Math::SetEpsilon(const Fractional& val)
+{
+	if(!(val.Null() || val.infinity || val.nan || val.negative))
+		defaultEpsilon = val;
+}
 
 Integer Math::min(const Integer& a, const Integer& b)
 {
@@ -1276,11 +1312,11 @@ Fractional Math::max(const Fractional& a, const Fractional& b)
 	return (a > b) ? a : b;
 }
 
-Integer Math::abs(const Integer& val)
+Integer		Math::abs(const Integer& val)
 {
 	return val.Negative() ? -val : val;
 }
-Fractional Math::abs(const Fractional& val)
+Fractional	Math::abs(const Fractional& val)
 {
 	return val.Negative() ? -val : val;
 }
@@ -1361,35 +1397,148 @@ Fractional Math::modf(const Fractional a, Fractional* intpart)
 	return res;
 }
 
-Integer Math::pow(const Integer& a, const Integer& b)
+Fractional Math::nroot(const Fractional& a, const Integer& n, const Fractional& epsilon)
 {
-	if (a.Null() && b.Null())
-		return Integer::FabrickNan(false);
-	if (a.Null())
-		return a;
-	if (b.Negative())
-		return 0_b;
-	Integer res = 1;
-	for (Integer i = 0_b; i < b; i++)
-		res *= a;
+	Fractional res = a, pr;
+	Integer inmin = n - 1;
+	Fractional fnmin = inmin;
+	Fractional fn = n;
+	while (true)
+	{
+		pr = (res * fnmin + a / pow(res, inmin)) / fn;
+		if (abs(res - pr) < epsilon)
+		{
+			res = pr;
+			break;
+		}
+		res = pr;
+	}
 	return res;
+}
+Fractional Math::nroot(const Fractional& a, const Integer& n)
+{
+	return nroot(a, n, defaultEpsilon);
+}
+Fractional Math::nroot(const Integer& a, const Integer& n)
+{
+	return nroot(static_cast<Fractional>(a), n, defaultEpsilon);
+}
+
+Fractional Math::pow(const Integer& a, const Integer& b)
+{
+	if (a.nan || b.nan)
+		return Fractional::FabrickNan(false);
+	if (a.infinity)
+		return b.Null() ? Fractional::FabrickNan(a.negative) : Fractional::FabrickInfinity(a.negative ? !even(b) : false);
+	if (b.infinity)
+		return a.Null() || a == 1 ? a : b;
+	if (a.Null())
+		return b.Null() ? Fractional::FabrickNan(false) : a;
+	Integer trueB = b;
+	bool negativeB = false;
+	if (b.negative)
+	{
+		negativeB = true;
+		trueB.MadeOpposite();
+	}
+	Integer res = 1;
+	for (Integer i = 0_b; i < trueB; i++)
+		res *= a;
+	return negativeB ? Fractional{1} / static_cast<Fractional>(res) : static_cast<Fractional>(res);
 }
 Fractional Math::pow(const Fractional& a, const Integer& b)
 {
-	if (a.Null() && b.Null())
-		return Integer::FabrickNan(false);
+	if (a.nan || b.nan)
+		return Fractional::FabrickNan(false);
+	if (a.infinity)
+		return b.Null() ? Fractional::FabrickNan(a.negative) : Fractional::FabrickInfinity(a.negative ? !even(b) : false);
+	if (b.infinity)
+		return a.Null() || a == 1 ? a : b;
 	if (a.Null())
-		return a;
-	if (b.Negative())
+		return b.Null() ? Fractional::FabrickNan(false) : a;
+	Integer trueB = b;
+	bool negativeB = false;
+	if (b.negative)
 	{
-		Fractional pr;
-		pr.SetMaxSignsAfterDotDiving(a.MaxSignsAfterDotDiving());
-		return pr / pow(a, -b);
+		negativeB = true;
+		trueB.MadeOpposite();
 	}
 	Fractional res = 1;
-	for (Integer i = 0_b; i < b; i++)
+	for (Integer i = 0_b; i < trueB; i++)
 		res *= a;
+	return negativeB ? Fractional{1} / res : res;
+}
+Fractional Math::pow(const Integer& a, const Fractional& b)
+{
+	return pow(static_cast<Fractional>(a), b);
+}
+Fractional Math::pow(const Fractional& a, const Fractional& b)
+{
+	return pow(a, b, defaultEpsilon);
+}
+Fractional Math::pow(const Fractional& a, const Fractional& b, const Fractional& epsilon)
+{
+	if (b.afterDot == 0)
+		return pow(a, static_cast<Integer>(b));
+	if (a.nan || b.nan)
+		return Fractional::FabrickNan(false);
+	if (a.infinity)
+		return b.Null() ? Fractional::FabrickNan(a.negative) : Fractional::FabrickInfinity(false);
+	if (b.infinity)
+		return a.Null() || a == 1 ? a : b;
+	if (a.Null())
+		return b.Null() ? Fractional::FabrickNan(false) : a;
+
+	Integer ie = static_cast<Integer>(b);
+	Fractional res = pow(a, ie);
+	Integer denum;
+	for (size_t i = 1; i < b.afterDot; ++i)
+		denum.number.push_back('\000');
+	denum.number.push_back('\001');
+	Integer num = static_cast<Integer>((b - ie) * denum);
+	roundUp10(num, denum);
+	return res * nroot(pow(a, num), denum, epsilon);
+}
+Fractional Math::nroot(const Fractional& a, const Fractional& n, const Fractional& epsilon)
+{
+	return pow(a, Fractional(1) / n, epsilon);
+}
+Fractional Math::nroot(const Fractional& a, const Fractional& n)
+{
+	return nroot(a, n, defaultEpsilon);
+}
+Fractional Math::nroot(const Integer& a, const Fractional& n)
+{
+	return nroot(a, n, defaultEpsilon);
+}
+
+Fractional Math::sqrt(const Fractional& x, const Fractional& epsilon)
+{//унать, что такое cpu в с++
+	if (x.nan || epsilon.nan || x.negative)
+		return Fractional::FabrickNan(false);
+	if (x.infinity)
+		return x;
+	Fractional res = x;
+	Fractional pr;
+	while (true)
+	{
+		pr = (res + x / res) / 2;
+		if (abs(res - pr) < epsilon)
+		{
+			res = pr;
+			break;
+		}
+		res = pr;
+	}
 	return res;
+}
+Fractional Math::sqrt(const Fractional& x)
+{
+	return sqrt(x, defaultEpsilon);
+}
+Fractional Math::sqrt(const Integer& x)
+{
+	return sqrt(static_cast<Fractional>(x), defaultEpsilon);
 }
 
 Fractional Math::exp(const Fractional& x, const Fractional& epsilon)
@@ -1418,7 +1567,7 @@ Fractional Math::exp(const Fractional& x, const Fractional& epsilon)
 }
 Fractional Math::exp(const Fractional& x)
 {
-	return exp(x, "0.00001"_fb);
+	return exp(x, defaultEpsilon);
 }
 Fractional Math::exp(const Integer& x)
 {
@@ -1457,7 +1606,7 @@ Fractional Math::ln(const Fractional& z, const Fractional& epsilon)
 }
 Fractional Math::ln(const Fractional& x)
 {
-	return ln(x, "0.00001"_fb);
+	return ln(x, defaultEpsilon);
 }
 Fractional Math::ln(const Integer& x)
 {
@@ -1478,17 +1627,59 @@ Integer Math::fact(const Integer& a)
 
 bool Math::prime(const Integer& num)
 {
-	if (num.Negative() || num.Null())
+	if (num.negative || num.Null() || num.nan || num.infinity)
 		return false;
-	if (num == 2_b)
+	if (num.number.size() == 1 && num.number[0] == '\002')
 		return true;
-	auto pr = static_cast<short>(num % 10);
-	if (pr % 2 == 0 || pr % 5 == 0 || num == 1_b)
+	auto pr = static_cast<short>(num.number[0]);
+	if (pr % 2 == 0 || pr % 5 == 0 || pr == 0 || (num.number.size() == 1 && num.number[0] == '\001'))
 		return false;
-	for (Integer i = 3; i < num; i += 2_b)
+	auto sqr = sqrt(num);
+	if (sqr.afterDot == 0)
+		return false;
+	for (Integer i = 3, end = static_cast<Integer>(sqr); i <= end; i += 2_b)
 		if ((num % i).Null())
 			return false;
 	return true;
+}
+bool Math::even(const Integer& num)
+{
+	if (num.number.empty() || num.nan || num.infinity)
+		return false;
+	return num.number[0] % '\002' == 0;
+}
+bool Math::noteven(const Integer& num)
+{
+	if (num.number.empty() || num.nan || num.infinity)
+		return false;
+	return num.number[0] % '\002' != 0;
+}
+bool Math::isint(const Fractional& num)
+{
+	return num.nan || num.infinity ? false : num.afterDot == 0;
+}
+
+size_t Math::sumOfNums(const Integer& num)
+{
+	size_t res = 0;
+	for (size_t i = 0; i < num.number.size(); ++i)
+		res += num.number[i];
+	return res;
+}
+
+void Math::roundUp10(Integer& a, Integer& b)
+{
+	while (a.number[0] % 5 == 0 && b.number[0] % 5 == 0)
+	{
+		a /= 5;
+		b /= 5;
+	}
+
+	while (a.number[0] % 2 == 0 && b.number[0] % 2 == 0)
+	{
+		a /= 2;
+		b /= 2;
+	}
 }
 
 #pragma endregion
