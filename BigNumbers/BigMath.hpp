@@ -42,6 +42,10 @@ public:
 	static Fractional exp(const Integer& x);
 	static Fractional exp(const Fractional& x);
 
+	static Fractional expFast(const Fractional& x, const Fractional& epsilon);
+	static Fractional expFast(const Integer& x);
+	static Fractional expFast(const Fractional& x);
+
 	/*Логарифм числа 'z' по основанию числа 'e'
 	Алгоритм на основе ряда Тейлора
 	The logarithm of the number 'z' based on 'e'

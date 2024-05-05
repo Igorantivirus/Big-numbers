@@ -216,6 +216,7 @@ public:
 	friend std::ostream& operator<<(std::ostream& out, const Fractional& val);
 
 private:
+public:
 	DecVector number;
 	size_t afterDot = 0;
 	bool negative = false;

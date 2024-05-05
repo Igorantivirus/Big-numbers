@@ -14,6 +14,8 @@ void		Math::SetEpsilon(const Fractional& val)
 		defaultEpsilon = val;
 }
 
+#pragma region std
+
 Integer Math::min(const Integer& a, const Integer& b)
 {
 	return (a < b) ? a : b;
@@ -117,6 +119,10 @@ Fractional Math::modf(const Fractional a, Fractional* intpart)
 	return res;
 }
 
+#pragma endregion
+
+#pragma region nroot
+
 Fractional Math::nroot(const Fractional& a, const Integer& n, const Fractional& epsilon)
 {
 	Fractional res = a, pr;
@@ -157,6 +163,10 @@ Fractional Math::nroot(const Integer& a, const Fractional& n)
 	return nroot(a, n, defaultEpsilon);
 }
 
+#pragma endregion
+
+#pragma region pow
+
 Fractional Math::pow(const Integer& a, const Integer& b)
 {
 	if (a.type == NumSpecialType::Nan)
@@ -167,17 +177,19 @@ Fractional Math::pow(const Integer& a, const Integer& b)
 		return a.Null() || a == 1 ? a : b;
 	if (a.Null())
 		return b.Null() ? Fractional::FabrickNan(false) : a;
-	Integer trueB = b;
-	bool negativeB = false;
-	if (b.negative)
-	{
-		negativeB = true;
-		trueB.MadeOpposite();
-	}
 	Integer res = 1;
-	for (Integer i = 0_b; i < trueB; i++)
-		res *= a;
-	return negativeB ? Fractional{1} / static_cast<Fractional>(res) : static_cast<Fractional>(res);
+	Integer nx = a;
+
+	Integer exp = b.Negative() ? b : -b;
+
+	while (!exp.Null())
+	{
+		if (!Math::even(exp))
+			res *= nx;
+		nx *= nx;
+		exp /= 2;
+	}
+	return !b.Negative() ? res : Fractional(1) / res;
 }
 Fractional Math::pow(const Fractional& a, const Integer& b)
 {
@@ -192,24 +204,20 @@ Fractional Math::pow(const Fractional& a, const Integer& b)
 	if (b.Null())
 		return 1;
 
-	Integer trueB = b;
-	bool negativeB = false;
-	if (b.negative)
-	{
-		negativeB = true;
-		trueB.MadeOpposite();
-	}
 	Fractional res = 1;
 	res.SetMaxSignsAfterDotDiving(a.MaxSignsAfterDotDiving());
-	for (Integer i = 0_b; i < trueB; i++)
-		res *= a;
-	if (negativeB)
+	Fractional nx = a;
+
+	Integer exp = b.Negative() ? b : -b;
+
+	while (!exp.Null())
 	{
-		Fractional pr = 1;
-		pr.SetMaxSignsAfterDotDiving(a.MaxSignsAfterDotDiving());
-		return pr / res;
+		if (!Math::even(exp))
+			res *= nx;
+		nx *= nx;
+		exp /= 2;
 	}
-	return res;
+	return !b.Negative() ? res : Fractional(1) / res;
 }
 Fractional Math::pow(const Integer& a, const Fractional& b)
 {
@@ -234,11 +242,15 @@ Fractional Math::pow(const Fractional& a, const Fractional& b, const Fractional&
 
 	Integer ie = static_cast<Integer>(b);
 	if (ie.Null())
-		return exp(b * ln(a, epsilon));
+		return exp(b * ln(a, epsilon), epsilon);
 	Fractional res = pow(a, ie);
 	Fractional pr = b - static_cast<Fractional>(ie);
 	return res * exp(pr * ln(a, epsilon), epsilon);
 }
+
+#pragma endregion
+
+#pragma region sqrt
 
 Fractional Math::sqrt(const Fractional& x, const Fractional& epsilon)
 {
@@ -265,26 +277,31 @@ Fractional Math::sqrt(const Integer& x)
 	return sqrt(static_cast<Fractional>(x), defaultEpsilon);
 }
 
+#pragma endregion
+
+#pragma region exp
+
 Fractional Math::exp(const Fractional& x, const Fractional& epsilon)
 {
 	if (x.type == NumSpecialType::Nan || epsilon.type == NumSpecialType::Nan)
 		return Fractional::FabrickNan(false);
 	if (x.type == NumSpecialType::Infinity)
 		return x;
-	Fractional res = x + 1;
-	Fractional prX = x;
+	Fractional tx = x.negative ? -x : x;
+	Fractional res = tx + 1;
+	Fractional prX = tx;
 	Fractional prF = 1;
 	Fractional term;
-	prF.maxAfterDot = term.maxAfterDot = std::max(x.maxAfterDot, epsilon.maxAfterDot);
+	prF.maxAfterDot = term.maxAfterDot = std::max(tx.maxAfterDot, epsilon.maxAfterDot);
 	Fractional i = 2;
 	do {
-		prX *= x;
+		prX *= tx;
 		prF *= i;
 		term = prX / prF;
 		res += term;
 		i += 1;
 	} while (abs(term) >= epsilon);
-	return round(res, epsilon.afterDot);
+	return x.negative ? Fractional(1) / round(res, epsilon.afterDot) : round(res, epsilon.afterDot);
 }
 Fractional Math::exp(const Fractional& x)
 {
@@ -294,6 +311,26 @@ Fractional Math::exp(const Integer& x)
 {
 	return exp(static_cast<Fractional>(x));
 }
+
+Fractional Math::expFast(const Fractional& x, const Fractional& epsilon)
+{
+	Integer ai = static_cast<Integer>(x);
+	Fractional af = x - static_cast<Fractional>(ai);
+
+	return Math::pow(Math::exp(1, epsilon), ai) * Math::exp(af, epsilon);
+}
+Fractional Math::expFast(const Integer& x)
+{
+	return expFast(static_cast<Fractional>(x), defaultEpsilon);
+}
+Fractional Math::expFast(const Fractional& x)
+{
+	return expFast(x, defaultEpsilon);
+}
+
+#pragma endregion
+
+#pragma region ln
 
 Fractional Math::ln(const Fractional& z, const Fractional& epsilon)
 {
@@ -324,6 +361,10 @@ Fractional Math::ln(const Integer& x)
 {
 	return ln(static_cast<Fractional>(x));
 }
+
+#pragma endregion
+
+#pragma region special
 
 Integer Math::fact(const Integer& a)
 {
@@ -385,6 +426,10 @@ void Math::roundUp10(Integer& a, Integer& b)
 		b /= 2;
 	}
 }
+
+#pragma endregion
+
+#pragma region triganam
 
 Fractional Math::pi(const unsigned int n)
 {
@@ -494,6 +539,10 @@ Fractional Math::ctg(const Fractional& xr)
 	return ctg(xr, defaultEpsilon);
 }
 
+#pragma endregion
+
+#pragma region arctriganam
+
 Fractional Math::arctg(const Fractional& x, const Fractional& epsilon)
 {
 	if (x.type == NumSpecialType::Nan)
@@ -556,5 +605,7 @@ Fractional Math::arccos(const Fractional& x)
 {
 	return arccos(x, defaultEpsilon);
 }
+
+#pragma endregion
 
 #pragma endregion
